@@ -1,0 +1,5 @@
+resources:
+- lease-crd.yaml
+- clusterrole.yaml
+- acquire-lease-task.yaml
+- release-lease-task.yaml
