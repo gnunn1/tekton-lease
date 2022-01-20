@@ -1,5 +1,0 @@
-kind: Lease
-metadata:
-  name: $(inputs.params.lease-name)
-spec:
-  owner: ${context.pipelineRun.name)

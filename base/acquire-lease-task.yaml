@@ -9,24 +9,26 @@ spec:
   - name: timeout
     type: string
     default: 20m
+  - name: owner
+    type: string
   steps:
     - name: create-lease
       image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
       script: |
 
         # EOF in yaml is hard, so make a file the simple way
-        echo 'apiVersion: demo.redhat.io/v1' > e2e-lease.yaml
-        echo 'kind: Lease' >> e2e-lease.yaml
-        echo 'metadata:' >> e2e-lease.yaml
-        echo '  name: $(inputs.params.lease-name)' >> e2e-lease.yaml
-        echo 'spec:' >> e2e-lease.yaml
-        echo '  owner: ${context.pipelineRun.name)' >> e2e-lease.yaml
-        echo '  created: $(date)' >> e2e-lease.yaml
+        echo "apiVersion: demo.redhat.io/v1" > e2e-lease.yaml
+        echo "kind: Lease" >> e2e-lease.yaml
+        echo "metadata:" >> e2e-lease.yaml
+        echo "  name: $(params.lease-name)" >> e2e-lease.yaml
+        echo "spec:" >> e2e-lease.yaml
+        echo "  owner: $(params.owner) " >> e2e-lease.yaml
+        echo "  created: $(date)" >> e2e-lease.yaml
 
         # Try to create a lease — either it succeeds, and we are good, or it fails, and then we wait for the lease to be deleted or a timeout, and then we make the lease if there was a deletion
         # In the event of a timeout, clear out the dead lease so it doesn't mess up future builds
 
-        kubectl create -f e2e-lease.yaml || (echo Waiting for lease && kubectl wait --for=delete lease.demo.redhat.io/$(inputs.params.lease-name) --timeout=$(inputs.params.timeout) || ( echo “Grabbing abandoned lease.” && kubectl delete lease.demo.redhat.io/$(inputs.params.lease-name) ))
+        kubectl create -f e2e-lease.yaml || (echo Waiting for lease && kubectl wait --for=delete lease.demo.redhat.io/$(params.lease-name) --timeout=$(params.timeout) || ( echo “Grabbing abandoned lease.” && kubectl delete lease.demo.redhat.io/$(params.lease-name) ))
 
         # We could be here for three reasons;
         # either we successfully created a lease,

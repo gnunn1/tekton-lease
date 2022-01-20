@@ -9,4 +9,4 @@ spec:
   steps:
     - name: delete-lease
       image: linkyard/kubectl:1.14.2
-      script: kubectl delete lease.demo.redhat.io/$(inputs.params.lease-name) --ignore-not-found=true
+      script: kubectl delete lease.demo.redhat.io/$(params.lease-name) --ignore-not-found=true
