@@ -36,4 +36,20 @@ spec:
         # or we waited and the other lease is still there.
         # Run an apply to make sure a lease with our name and label now exists.
 
-        kubectl apply -f e2e-lease.yaml
+        # We have to check first in case there is already an old lease
+        if ! oc get le $(params.LEASE_NAME) -o yaml;
+          then
+            echo "Hey!!! There isn't any lease."
+            while ! kubectl create -f e2e-lease.yaml
+            do
+              # If the loop runs is because there is already a lease and it belongs to other pipeline run (you can check the owner field)
+              echo Waiting for lease
+              kubectl wait --for=delete lease.redhat.com/$(params.LEASE_NAME) --timeout=20m
+            done
+          else
+            # If this block gets executed is because the release lease task either wasn't executed or got some error. So we delete the old one and create a brand-new.
+            echo “Grabbing abandoned lease.”
+            kubectl delete lease.demo.redhat.io/$(params.lease-name)
+            echo "Creating a brand-new one."
+            kubectl apply -f e2e-lease.yaml
+        fi
