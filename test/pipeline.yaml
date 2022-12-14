@@ -13,6 +13,8 @@ spec:
           value: "$(context.pipeline.name)"
         - name: owner
           value: "$(context.pipelineRun.name)"
+        - name: timeout
+          value: 120s
     - name: sleep
       taskRef:
         name: sleep
