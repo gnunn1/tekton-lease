@@ -1,0 +1,3 @@
+resources:
+- sleep-task.yaml
+- pipeline.yaml

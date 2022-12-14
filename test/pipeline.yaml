@@ -1,0 +1,31 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: test-lease
+spec:
+  tasks:
+    - name: acquire-lease
+      taskRef:
+        name: acquire-lease
+        kind: ClusterTask
+      params:
+        - name: lease-name
+          value: "$(context.pipeline.name)"
+        - name: owner
+          value: "$(context.pipelineRun.name)"
+    - name: sleep
+      taskRef:
+        name: sleep
+      runafter:
+        - acquire-lease
+      params:
+        - name: duration
+          value: "60"
+  finally:
+    - name: release-lease
+      taskRef:
+        name: release-lease
+        kind: ClusterTask
+      params:
+        - name: lease-name
+          value: "$(context.pipeline.name)"
