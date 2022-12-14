@@ -33,9 +33,6 @@ spec:
         acquire_lease() {
             echo "Attempting to create lease $(params.lease-name)"
 
-            ls e2e-lease.yaml
-            cat e2e-lease.yaml
-
             until kubectl create -f e2e-lease.yaml
             do
               echo "Waiting for lease..."
