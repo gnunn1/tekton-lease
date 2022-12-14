@@ -6,9 +6,11 @@ spec:
   params:
   - name: duration
     type: string
-    default: "30"
+    default: "10"
   steps:
   - image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
     name: sleep
     script: |
+
+      echo "Sleeping for $(params.duration) seconds"
       sleep $(params.duration)

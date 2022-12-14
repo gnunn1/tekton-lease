@@ -16,24 +16,72 @@ spec:
       image: image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
       script: |
 
-        # EOF in yaml is hard, so make a file the simple way
-        echo "apiVersion: demo.redhat.io/v1" > e2e-lease.yaml
-        echo "kind: Lease" >> e2e-lease.yaml
-        echo "metadata:" >> e2e-lease.yaml
-        echo "  name: $(params.lease-name)" >> e2e-lease.yaml
-        echo "spec:" >> e2e-lease.yaml
-        echo "  owner: $(params.owner) " >> e2e-lease.yaml
-        echo "  created: $(date)" >> e2e-lease.yaml
+        calculate_duration_in_seconds() {
+            if [ "${1: -1}" == "m" ]; then
+                total_duration_in_seconds=$((${1:: -1} * 60))
+            # If it is "h", then the token is in hours
+            elif [ "${1: -1}" == "h" ]; then
+                total_duration_in_seconds=$((${1:: -1} * 3600))
+            elif [ "${1: -1}" == "s" ]; then
+                total_duration_in_seconds=$((${1:: -1}))
+            # Otherwise, the token is in seconds
+            else
+                total_duration_in_seconds=${1}
+            fi
+        }
 
-        # Try to create a lease — either it succeeds, and we are good, or it fails, and then we wait for the lease to be deleted or a timeout, and then we make the lease if there was a deletion
-        # In the event of a timeout, clear out the dead lease so it doesn't mess up future builds
+        acquire_lease() {
+            echo "Attempting to create lease $(params.lease-name)"
 
-        kubectl create -f e2e-lease.yaml || (echo Waiting for lease && kubectl wait --for=delete lease.demo.redhat.io/$(params.lease-name) --timeout=$(params.timeout) || ( echo “Grabbing abandoned lease.” && kubectl delete lease.demo.redhat.io/$(params.lease-name) ))
+            ls e2e-lease.yaml
+            cat e2e-lease.yaml
 
-        # We could be here for three reasons;
-        # either we successfully created a lease,
-        # we waited and another run's lease got deleted,
-        # or we waited and the other lease is still there.
-        # Run an apply to make sure a lease with our name and label now exists.
+            until kubectl create -f e2e-lease.yaml
+            do
+              echo "Waiting for lease..."
+              kubectl wait --for=delete lease $(params.lease-name) --timeout=$(params.timeout)
+            done
+        }
 
-        kubectl apply -f e2e-lease.yaml
+        create_lease_yaml() {
+          microTime=$(date -u +"%Y-%m-%dT%H:%M:%S.000000Z")
+
+          # EOF in yaml is hard, so make a file the simple way
+          echo "apiVersion: coordination.k8s.io/v1" > e2e-lease.yaml
+          echo "kind: Lease" >> e2e-lease.yaml
+          echo "metadata:" >> e2e-lease.yaml
+          echo "  name: $(params.lease-name)" >> e2e-lease.yaml
+          echo "spec:" >> e2e-lease.yaml
+          echo "  acquireTime: ${microTime}" >> e2e-lease.yaml
+          echo "  leaseDurationSeconds: ${total_duration_in_seconds}" >> e2e-lease.yaml
+          echo "  holderIdentity: $(params.owner)" >> e2e-lease.yaml
+        }
+
+        # Calculate duration in seconds to store in lease
+        calculate_duration_in_seconds $(params.timeout)
+        # Create yaml that will be used for the lease object
+        create_lease_yaml
+
+        # Acquire Lease
+        export -f acquire_lease
+        timeout $(params.timeout) bash -c "acquire_lease"
+
+        # Test if we acquired lease or was it abandoned?
+        leaseOwner=$(kubectl get lease $(params.lease-name) -o=jsonpath='{.spec.holderIdentity}')
+        echo "The owner of the lease is ${leaseOwner}"
+        if [[ ${leaseOwner} != "$(params.owner)" ]]; then
+          acquiredTime=$(oc get lease $(params.lease-name) -o=jsonpath='{.spec.acquiredTime}')
+          elapsedSeconds=$(date -d"${acquiredTime}" +%s)
+          if (( elapsedSeconds > total_duration_in_seconds)); then
+            echo "Lease abandoned, deleting"
+            kubectl delete lease $(params.lease-name)
+            if kubectl create -f e2e-lease.yaml; then
+              echo "Acquired lease $(params.lease-name)"
+            else
+              echo "Could not acquire lease, stopping execution"
+              exit 1
+            fi
+          fi
+        else
+          echo "Acquired lease $(params.lease-name)"
+        fi

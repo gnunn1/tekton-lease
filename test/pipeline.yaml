@@ -20,7 +20,7 @@ spec:
         - acquire-lease
       params:
         - name: duration
-          value: "60"
+          value: "30"
   finally:
     - name: release-lease
       taskRef:
