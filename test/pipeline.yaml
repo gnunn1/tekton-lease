@@ -18,7 +18,7 @@ spec:
     - name: sleep
       taskRef:
         name: sleep
-      runafter:
+      runAfter:
         - acquire-lease
       params:
         - name: duration
